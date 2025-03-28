@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import com.avans.decorator.FooterDecorator;
 import com.avans.decorator.HeaderDecorator;
 import com.avans.decorator.IReport;
+import com.avans.domain.backlog.Activity;
 import com.avans.domain.backlog.BacklogItem;
 import com.avans.domain.discussions.DiscussionMessage;
 import com.avans.domain.discussions.DiscussionThread;
@@ -45,11 +46,24 @@ public class Main {
         // 3. Maak een BacklogItem en voeg het toe aan het project
         BacklogItem backlogItem = new BacklogItem("Implement login feature");
         backlogItem.addObserver(dev); // Notificeer de developer bij wijzigingen
+        backlogItem.assignDeveloper(dev); // Assign the developer
+        
+        // Add activity and mark it as done
+        Activity activity = new Activity("Implement OAuth2", 4);
+        activity.setDone(true);
+        backlogItem.addActivity(activity);
 
         // Simuleer state-transities in het BacklogItem (bijv. Todo -> Doing)
         System.out.println("Backlog item initial state: " + backlogItem.getState().getName());
         backlogItem.moveToNextState();  // van Todo naar Doing
         System.out.println("Backlog item state after move: " + backlogItem.getState().getName());
+
+        // Move backlog item to done for release
+        backlogItem.moveToNextState(); // Doing -> Ready for Testing
+        backlogItem.moveToNextState(); // Ready for Testing -> Testing
+        backlogItem.moveToNextState(); // Testing -> Tested
+        backlogItem.moveToNextState(); // Tested -> Done
+        System.out.println("Backlog item final state: " + backlogItem.getState().getName());
 
         // 4. Maak een Discussion forum voor dit backlog item (Composite pattern)
         DiscussionThread discussionThread = new DiscussionThread("Login Feature Discussion");
@@ -72,6 +86,17 @@ public class Main {
 
         ReleaseSprint releaseSprint = new ReleaseSprint("Release Sprint 1", startDate, endDate);
         releaseSprint.setPipeline(pipeline);
+        releaseSprint.addBacklogItem(backlogItem);
+        releaseSprint.setScrumMaster(scrumMaster);
+        releaseSprint.addTeamMember(dev);
+
+        // First start the sprint
+        releaseSprint.start();
+        System.out.println("Sprint started");
+        
+        // Then finish the sprint
+        releaseSprint.finish();
+        System.out.println("Sprint finished");
 
         // 7. Doorloop de ReleaseSprint states via de API-methoden
         System.out.println("Initial release state: " + releaseSprint.getState().getName());

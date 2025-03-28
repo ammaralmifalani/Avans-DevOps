@@ -52,7 +52,8 @@ public class ReleaseSprint extends Sprint {
         return pipelineRunning;
     }
     
-    private void setPipelineRunning(boolean running) {
+    // Made public for testing
+    public void setPipelineRunning(boolean running) {
         this.pipelineRunning = running;
     }
 

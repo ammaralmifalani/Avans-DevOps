@@ -12,7 +12,7 @@ public class Pipeline {
     private PipelineStepFactory stepFactory;
     private PipelineRunStrategy runStrategy;
     private ReleaseSprint releaseSprint;
-    private boolean isRunning;
+    private boolean isRunning; // Keep the field
     private boolean lastRunSuccessful;
 
     public Pipeline(String name, PipelineRunStrategy runStrategy) {
@@ -25,14 +25,16 @@ public class Pipeline {
     }
 
     public void addStep(PipelineStep step) {
-        if (isRunning) {
+        // FIX: Use the isRunning() method for the check
+        if (this.isRunning()) {
             throw new IllegalStateException("Cannot add steps while pipeline is running");
         }
         steps.add(step);
     }
 
     public PipelineStep createAndAddStep(String stepType) {
-        if (isRunning) {
+        // FIX: Use the isRunning() method for the check (Consistency)
+        if (this.isRunning()) {
             throw new IllegalStateException("Cannot add steps while pipeline is running");
         }
         PipelineStep step = stepFactory.createStep(stepType);
@@ -43,35 +45,37 @@ public class Pipeline {
     }
 
     public void runAllSteps() {
-        if (isRunning) {
+        // FIX: Use the isRunning() method for the check
+        if (this.isRunning()) {
             throw new IllegalStateException("Pipeline is already running");
         }
-        
-        isRunning = true;
+
+        isRunning = true; // Set the actual state when running starts
         System.out.println("Starting pipeline: " + name);
-        
+
         try {
             boolean successful = runStrategy.runSteps(steps);
             lastRunSuccessful = successful;
         } finally {
-            isRunning = false;
+            isRunning = false; // Reset the actual state when running finishes
             System.out.println("Pipeline completed with status: " + (lastRunSuccessful ? "SUCCESS" : "FAILURE"));
-            
+
             // Notify the release sprint about completion
             if (releaseSprint != null) {
                 releaseSprint.finishRelease(lastRunSuccessful);
             }
         }
     }
-    
+
     public void setReleaseSprint(ReleaseSprint sprint) {
         this.releaseSprint = sprint;
     }
-    
+
+    // Keep the getter for the field state
     public boolean isRunning() {
         return isRunning;
     }
-    
+
     public boolean wasLastRunSuccessful() {
         return lastRunSuccessful;
     }
@@ -79,7 +83,7 @@ public class Pipeline {
     public String getName() {
         return name;
     }
-    
+
     public List<PipelineStep> getSteps() {
         return new ArrayList<>(steps); // Return a copy to preserve encapsulation
     }
