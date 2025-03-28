@@ -6,6 +6,11 @@ public class TestedState implements IBacklogState {
     private static final String NAME = "Tested";
     @Override
     public void moveToNext(BacklogItem item) {
+        // Verify all activities are completed before moving to Done
+        if (!item.areAllActivitiesDone()) {
+            throw new IllegalStateException("Cannot move to Done state: not all activities are completed");
+        }
+        
         item.setState(new DoneState());
     }
 
@@ -18,5 +23,4 @@ public class TestedState implements IBacklogState {
     public String getName() {
         return NAME;
     }
-
 }
