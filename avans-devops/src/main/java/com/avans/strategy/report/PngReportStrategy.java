@@ -108,8 +108,8 @@ public class PngReportStrategy implements IReportStrategy {
             reportContent.append("\n");
             
             // Visual representation
-            for (int items = totalItems; items >= 0; items--) {
-                reportContent.append(String.format("%3d |", items));
+            for (int remainingItems = totalItems; remainingItems >= 0; remainingItems--) {
+                reportContent.append(String.format("%3d |", remainingItems));
                 
                 for (int day = 0; day <= sprintLength; day++) {
                     int expected = totalItems - (int)((double)day / sprintLength * totalItems);
@@ -123,17 +123,17 @@ public class PngReportStrategy implements IReportStrategy {
                             actual = itemsRemaining;
                         }
                         
-                        if (items == expected && items == actual) {
+                        if (remainingItems == expected && remainingItems == actual) {
                             reportContent.append(" X "); // Both ideal and actual
-                        } else if (items == expected) {
+                        } else if (remainingItems == expected) {
                             reportContent.append(" I "); // Ideal only
-                        } else if (items == actual) {
+                        } else if (remainingItems == actual) {
                             reportContent.append(" A "); // Actual only
                         } else {
                             reportContent.append("   ");
                         }
                     } else {
-                        if (items == expected) {
+                        if (remainingItems == expected) {
                             reportContent.append(" I "); // Ideal only
                         } else {
                             reportContent.append("   ");

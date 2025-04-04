@@ -129,31 +129,48 @@ class PipelineTest {
     @Test
     @DisplayName("Cannot add steps while pipeline is running")
     void cannotAddStepsWhilePipelineIsRunning() {
-        // Create a mock Pipeline that appears to be running
-        pipeline = spy(new Pipeline("Test Pipeline", new AlwaysContinueStrategy()));
-        when(pipeline.isRunning()).thenReturn(true);
+        // Create a real pipeline and manually set the running flag using reflection
+        pipeline = new Pipeline("Test Pipeline", new AlwaysContinueStrategy());
         
-        // Try to add a step - should throw exception
-        Exception exception = assertThrows(IllegalStateException.class, () -> {
-            pipeline.addStep(successStep);
-        });
-        
-        assertTrue(exception.getMessage().contains("Cannot add steps while pipeline is running"));
+        try {
+            // Use reflection to set isRunning field to true
+            java.lang.reflect.Field field = Pipeline.class.getDeclaredField("isRunning");
+            field.setAccessible(true);
+            field.set(pipeline, true);
+            
+            // Try to add a step - should throw exception
+            PipelineStep newStep = new TestSuccessStep();
+            Exception exception = assertThrows(IllegalStateException.class, () -> {
+                pipeline.addStep(newStep);
+            });
+            
+            assertTrue(exception.getMessage().contains("Cannot add steps while pipeline is running"));
+        } catch (Exception e) {
+            fail("Test setup failed: " + e.getMessage());
+        }
     }
 
     @Test
     @DisplayName("Cannot run pipeline that is already running")
     void cannotRunPipelineThatIsAlreadyRunning() {
-        // Create a mock Pipeline that appears to be running
-        pipeline = spy(new Pipeline("Test Pipeline", new AlwaysContinueStrategy()));
-        when(pipeline.isRunning()).thenReturn(true);
+        // Create a real pipeline and manually set the running flag using reflection
+        pipeline = new Pipeline("Test Pipeline", new AlwaysContinueStrategy());
         
-        // Try to run the pipeline again - should throw exception
-        Exception exception = assertThrows(IllegalStateException.class, () -> {
-            pipeline.runAllSteps();
-        });
-        
-        assertTrue(exception.getMessage().contains("Pipeline is already running"));
+        try {
+            // Use reflection to set isRunning field to true
+            java.lang.reflect.Field field = Pipeline.class.getDeclaredField("isRunning");
+            field.setAccessible(true);
+            field.set(pipeline, true);
+            
+            // Try to run the pipeline again - should throw exception
+            Exception exception = assertThrows(IllegalStateException.class, () -> {
+                pipeline.runAllSteps();
+            });
+            
+            assertTrue(exception.getMessage().contains("Pipeline is already running"));
+        } catch (Exception e) {
+            fail("Test setup failed: " + e.getMessage());
+        }
     }
     
     // Concrete subclass for successful steps

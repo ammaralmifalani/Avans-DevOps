@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.avans.decorator.IReport;
 import com.avans.domain.backlog.BacklogItem;
+import com.avans.domain.backlog.state.IBacklogState;
 import com.avans.domain.member.Developer;
 import com.avans.domain.member.ScrumMaster;
 import com.avans.domain.member.TeamMember;
@@ -32,6 +33,9 @@ class ReportStrategyTest {
     
     @Mock
     private BacklogItem mockBacklogItem;
+    
+    @Mock
+    private IBacklogState mockBacklogState;
     
     private List<TeamMember> teamMembers;
     private List<BacklogItem> backlogItems;
@@ -51,6 +55,10 @@ class ReportStrategyTest {
         
         backlogItems = new ArrayList<>();
         backlogItems.add(mockBacklogItem);
+        
+        // Setup mock backlog state - this fixes the NPE
+        when(mockBacklogState.getName()).thenReturn("Todo");
+        when(mockBacklogItem.getState()).thenReturn(mockBacklogState);
         
         // Setup mock sprint
         when(mockSprint.getName()).thenReturn(sprintName);
@@ -76,8 +84,8 @@ class ReportStrategyTest {
         assertNotNull(content);
         assertTrue(content.contains("PDF"));
         assertTrue(content.contains(sprintName));
-        assertTrue(content.contains(startDate.toString()));
-        assertTrue(content.contains(endDate.toString()));
+        assertTrue(content.contains(startDate.format(java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy"))));
+        assertTrue(content.contains(endDate.format(java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy"))));
     }
     
     @Test
@@ -94,8 +102,8 @@ class ReportStrategyTest {
         assertNotNull(content);
         assertTrue(content.contains("PNG"));
         assertTrue(content.contains(sprintName));
-        assertTrue(content.contains(startDate.toString()));
-        assertTrue(content.contains(endDate.toString()));
+        assertTrue(content.contains(startDate.format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy"))));
+        assertTrue(content.contains(endDate.format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy"))));
     }
     
     @Test
