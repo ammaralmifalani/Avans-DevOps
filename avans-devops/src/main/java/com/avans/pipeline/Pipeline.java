@@ -59,9 +59,10 @@ public class Pipeline {
         }
         
         isRunning = true;
-        logMessage("Starting pipeline: " + name);
         lastRunTime = LocalDateTime.now();
-        executionLogs.clear();
+        executionLogs.clear(); // Clear logs BEFORE adding the first log message
+        
+        logMessage("Starting pipeline: " + name); // Now this message will be kept
         
         try {
             LocalDateTime startTime = LocalDateTime.now();
