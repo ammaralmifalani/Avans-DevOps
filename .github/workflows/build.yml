@@ -11,18 +11,18 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0  # Shallow clones should be disabled for better analysis
     
     - name: Set up JDK 11
-      uses: actions/setup-java@v2
+      uses: actions/setup-java@v3
       with:
         java-version: '11'
-        distribution: 'adopt'
+        distribution: 'temurin'
         
     - name: Cache Maven packages
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: ~/.m2
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
@@ -32,7 +32,7 @@ jobs:
       run: mvn -B clean verify package --file avans-devops/pom.xml
     
     - name: Cache SonarCloud packages
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: ~/.sonar/cache
         key: ${{ runner.os }}-sonar
@@ -42,4 +42,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}    # Generated in SonarCloud
-      run: mvn -B sonar:sonar --file avans-devops/pom.xml
+      run: mvn -B sonar:sonar --file avans-devops/pom.xml -Psonar
