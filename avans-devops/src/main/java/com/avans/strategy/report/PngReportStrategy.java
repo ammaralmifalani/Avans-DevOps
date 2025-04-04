@@ -3,10 +3,13 @@ package com.avans.strategy.report;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.avans.decorator.ConcreteReport;
 import com.avans.decorator.IReport;
 import com.avans.domain.backlog.BacklogItem;
+import com.avans.domain.backlog.state.DoneState;
 import com.avans.domain.member.TeamMember;
 import com.avans.domain.project.Sprint;
 
@@ -38,15 +41,10 @@ public class PngReportStrategy implements IReportStrategy {
         
         // Progress chart 
         List<BacklogItem> items = sprint.getBacklogItems();
-        int todoCount = 0, doingCount = 0, testingCount = 0, doneCount = 0;
         
-        for (BacklogItem item : items) {
-            String state = item.getState().getName();
-            if (state.equals("Todo")) todoCount++;
-            else if (state.equals("Doing")) doingCount++;
-            else if (state.contains("Test")) testingCount++;
-            else if (state.equals("Done")) doneCount++;
-        }
+        // Count items by state
+        Map<String, Long> stateCount = items.stream()
+            .collect(Collectors.groupingBy(item -> item.getState().getName(), Collectors.counting()));
         
         reportContent.append("\n== STATUS DASHBOARD ==\n");
         int totalItems = items.size();
@@ -54,48 +52,114 @@ public class PngReportStrategy implements IReportStrategy {
         
         // Draw a bar chart
         if (totalItems > 0) {
-            int todoBarLength = (int) (20.0 * todoCount / totalItems);
-            int doingBarLength = (int) (20.0 * doingCount / totalItems);
-            int testingBarLength = (int) (20.0 * testingCount / totalItems);
-            int doneBarLength = (int) (20.0 * doneCount / totalItems);
-            
-            reportContent.append("Todo    │").append("█".repeat(todoBarLength)).append(" ").append(todoCount).append("\n");
-            reportContent.append("Doing   │").append("█".repeat(doingBarLength)).append(" ").append(doingCount).append("\n");
-            reportContent.append("Testing │").append("█".repeat(testingBarLength)).append(" ").append(testingCount).append("\n");
-            reportContent.append("Done    │").append("█".repeat(doneBarLength)).append(" ").append(doneCount).append("\n");
+            stateCount.forEach((state, count) -> {
+                int barLength = (int) (20.0 * count / totalItems);
+                reportContent.append(padRight(state, 10))
+                             .append("│")
+                             .append("█".repeat(barLength))
+                             .append(" ")
+                             .append(count)
+                             .append("\n");
+            });
         }
         
         // Burndown chart
         reportContent.append("\n== BURNDOWN CHART ==\n");
         reportContent.append("Items remaining to complete:\n");
         
-        int itemsRemaining = totalItems - doneCount;
-        int sprintLength = calculateSprintDays(sprint.getStartDate(), sprint.getEndDate());
+        int completedItems = (int) items.stream().filter(item -> item.getState() instanceof DoneState).count();
+        int itemsRemaining = totalItems - completedItems;
+        int sprintLength = calculateDuration(sprint.getStartDate(), sprint.getEndDate());
         int daysElapsed = calculateDaysElapsed(sprint.getStartDate(), LocalDate.now());
         
         if (sprintLength > 0) {
-            reportContent.append("Day 0: ").append(totalItems).append("\n");
+            // Print day header
+            reportContent.append("     ");
+            for (int day = 0; day <= sprintLength; day++) {
+                reportContent.append(String.format("%2d ", day));
+            }
+            reportContent.append("\n");
             
-            // Simulate a burndown line (simplistic model)
-            for (int day = 1; day <= sprintLength; day++) {
-                int expectedRemaining = Math.max(0, (int)(totalItems * (1 - (double)day/sprintLength)));
-                
+            // Ideal line
+            reportContent.append("Ideal");
+            for (int day = 0; day <= sprintLength; day++) {
+                int expected = totalItems - (int)((double)day / sprintLength * totalItems);
+                reportContent.append(String.format("%2d ", expected));
+            }
+            reportContent.append("\n");
+            
+            // Actual line (with question marks for future)
+            reportContent.append("Actual");
+            for (int day = 0; day <= sprintLength; day++) {
                 if (day <= daysElapsed) {
-                    // For past days, show actual vs ideal
-                    int actualRemaining = day == daysElapsed ? itemsRemaining : 
-                                         Math.min(totalItems, itemsRemaining + (daysElapsed - day));
-                    
-                    reportContent.append("Day ").append(day).append(": ")
-                                 .append(actualRemaining).append(" (actual), ")
-                                 .append(expectedRemaining).append(" (ideal)\n");
+                    // For past days, interpolate a simulated value
+                    int actual = totalItems;
+                    if (daysElapsed > 0) {
+                        actual = totalItems - (int)((double)day / daysElapsed * completedItems);
+                    }
+                    if (day == daysElapsed) {
+                        actual = itemsRemaining;
+                    }
+                    reportContent.append(String.format("%2d ", actual));
                 } else {
-                    // For future days, show only ideal
-                    reportContent.append("Day ").append(day).append(": ")
-                                 .append("? (actual), ")
-                                 .append(expectedRemaining).append(" (ideal)\n");
+                    reportContent.append(" ? ");
                 }
             }
+            reportContent.append("\n");
+            
+            // Visual representation
+            for (int items = totalItems; items >= 0; items--) {
+                reportContent.append(String.format("%3d |", items));
+                
+                for (int day = 0; day <= sprintLength; day++) {
+                    int expected = totalItems - (int)((double)day / sprintLength * totalItems);
+                    
+                    if (day <= daysElapsed) {
+                        int actual = totalItems;
+                        if (daysElapsed > 0) {
+                            actual = totalItems - (int)((double)day / daysElapsed * completedItems);
+                        }
+                        if (day == daysElapsed) {
+                            actual = itemsRemaining;
+                        }
+                        
+                        if (items == expected && items == actual) {
+                            reportContent.append(" X "); // Both ideal and actual
+                        } else if (items == expected) {
+                            reportContent.append(" I "); // Ideal only
+                        } else if (items == actual) {
+                            reportContent.append(" A "); // Actual only
+                        } else {
+                            reportContent.append("   ");
+                        }
+                    } else {
+                        if (items == expected) {
+                            reportContent.append(" I "); // Ideal only
+                        } else {
+                            reportContent.append("   ");
+                        }
+                    }
+                }
+                reportContent.append("\n");
+            }
+            
+            reportContent.append("    +");
+            reportContent.append("-".repeat((sprintLength + 1) * 3));
+            reportContent.append("\n");
+            
+            reportContent.append("     ");
+            for (int day = 0; day <= sprintLength; day++) {
+                reportContent.append(String.format("%2d ", day));
+            }
+            reportContent.append("\n");
         }
+        
+        // Additional metadata specific to PNG format
+        reportContent.append("\n== IMAGE METADATA ==\n");
+        reportContent.append("Generated on: ").append(formatDate(LocalDate.now())).append("\n");
+        reportContent.append("Format: PNG Image\n");
+        reportContent.append("Resolution: 1280x720px\n");
+        reportContent.append("Color mode: RGB\n");
         
         return new ConcreteReport(reportContent.toString());
     }
@@ -112,7 +176,7 @@ public class PngReportStrategy implements IReportStrategy {
         return String.format("%-" + n + "s", s);
     }
     
-    private int calculateSprintDays(LocalDate start, LocalDate end) {
+    private int calculateDuration(LocalDate start, LocalDate end) {
         return (int) java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1;
     }
     

@@ -3,10 +3,13 @@ package com.avans.strategy.report;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.avans.decorator.ConcreteReport;
 import com.avans.decorator.IReport;
 import com.avans.domain.backlog.BacklogItem;
+import com.avans.domain.backlog.state.DoneState;
 import com.avans.domain.member.TeamMember;
 import com.avans.domain.project.Sprint;
 
@@ -19,7 +22,8 @@ public class PdfReportStrategy implements IReportStrategy {
         reportContent.append("=== PDF SPRINT REPORT ===\n\n");
         reportContent.append("Sprint: ").append(sprint.getName()).append("\n");
         reportContent.append("Duration: ").append(formatDate(sprint.getStartDate()))
-                     .append(" to ").append(formatDate(sprint.getEndDate())).append("\n\n");
+                     .append(" to ").append(formatDate(sprint.getEndDate())).append("\n");
+        reportContent.append("Duration (days): ").append(calculateDuration(sprint.getStartDate(), sprint.getEndDate())).append("\n\n");
         
         // Team members section
         reportContent.append("== TEAM COMPOSITION ==\n");
@@ -36,17 +40,19 @@ public class PdfReportStrategy implements IReportStrategy {
         reportContent.append("Total Items: ").append(items.size()).append("\n");
         
         // Count items by state
-        int todoCount = 0, doingCount = 0, testingCount = 0, doneCount = 0;
+        Map<String, Long> stateCount = items.stream()
+            .collect(Collectors.groupingBy(item -> item.getState().getName(), Collectors.counting()));
         
+        reportContent.append("\nItems by Status:\n");
+        stateCount.forEach((state, count) -> 
+            reportContent.append("- ").append(state).append(": ").append(count).append("\n")
+        );
+        
+        // List items
+        reportContent.append("\nItem Details:\n");
         for (BacklogItem item : items) {
-            String state = item.getState().getName();
-            if (state.equals("Todo")) todoCount++;
-            else if (state.equals("Doing")) doingCount++;
-            else if (state.contains("Test")) testingCount++;
-            else if (state.equals("Done")) doneCount++;
-            
             reportContent.append("- ").append(item.getTitle())
-                         .append(" [").append(state).append("] ");
+                         .append(" [").append(item.getState().getName()).append("] ");
             
             if (item.getAssignedDeveloper() != null) {
                 reportContent.append("- Assigned to: ").append(item.getAssignedDeveloper().getName());
@@ -72,20 +78,53 @@ public class PdfReportStrategy implements IReportStrategy {
         // Sprint progress
         reportContent.append("\n== SPRINT PROGRESS ==\n");
         int totalItems = items.size();
-        int completedItems = doneCount;
+        int completedItems = (int) items.stream().filter(item -> item.getState() instanceof DoneState).count();
         double completionPercentage = totalItems > 0 ? (double) completedItems / totalItems * 100 : 0;
         
         reportContent.append("Completion: ").append(String.format("%.1f%%", completionPercentage)).append("\n");
-        reportContent.append("Items by Status:\n");
-        reportContent.append("- Todo: ").append(todoCount).append("\n");
-        reportContent.append("- Doing: ").append(doingCount).append("\n");
-        reportContent.append("- Testing: ").append(testingCount).append("\n");
-        reportContent.append("- Done: ").append(doneCount).append("\n");
         
-        // Simple burndown chart (ASCII art)
+        // Burndown chart (ASCII art)
         reportContent.append("\n== BURNDOWN CHART ==\n");
-        reportContent.append("TODO: Generate visual burndown chart\n");
+        int totalDays = calculateDuration(sprint.getStartDate(), sprint.getEndDate());
+        int daysElapsed = calculateDaysElapsed(sprint.getStartDate(), LocalDate.now());
+        
+        // Header
+        reportContent.append("Days: ");
+        for (int i = 0; i <= totalDays; i++) {
+            reportContent.append(String.format("%3d", i));
+        }
+        reportContent.append("\n");
+        
+        // Ideal burndown
+        reportContent.append("Ideal: ");
+        for (int i = 0; i <= totalDays; i++) {
+            int remaining = Math.max(0, totalItems - (int)((double)i / totalDays * totalItems));
+            reportContent.append(String.format("%3d", remaining));
+        }
+        reportContent.append("\n");
+        
+        // Actual burndown
+        reportContent.append("Actual: ");
+        for (int i = 0; i <= totalDays; i++) {
+            if (i <= daysElapsed) {
+                // For past days, show a simulated actual value (just for demonstration)
+                int actualRemaining = totalItems - (int)((double)i / daysElapsed * completedItems);
+                if (i == daysElapsed) actualRemaining = totalItems - completedItems;
+                reportContent.append(String.format("%3d", actualRemaining));
+            } else {
+                reportContent.append("  ?");
+            }
+        }
+        reportContent.append("\n");
+        
+        // Current progress
         reportContent.append("Current completed work: ").append(completedItems).append(" of ").append(totalItems).append(" items\n");
+        
+        // Additional metadata
+        reportContent.append("\n== DOCUMENT METADATA ==\n");
+        reportContent.append("Generated on: ").append(formatDate(LocalDate.now())).append("\n");
+        reportContent.append("Format: PDF Report\n");
+        reportContent.append("Version: 1.0\n");
         
         return new ConcreteReport(reportContent.toString());
     }
@@ -96,5 +135,14 @@ public class PdfReportStrategy implements IReportStrategy {
     
     private String getScrumMasterName(Sprint sprint) {
         return sprint.getScrumMaster() != null ? sprint.getScrumMaster().getName() : "Not assigned";
+    }
+    
+    private int calculateDuration(LocalDate start, LocalDate end) {
+        return (int) java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1;
+    }
+    
+    private int calculateDaysElapsed(LocalDate start, LocalDate current) {
+        return (int) java.time.temporal.ChronoUnit.DAYS.between(start, 
+                current.isAfter(start) ? current : start);
     }
 }
