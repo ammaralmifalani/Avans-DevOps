@@ -4,12 +4,16 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
 import com.avans.domain.project.ReleaseSprint;
 import com.avans.factory.PipelineStepFactory;
 import com.avans.strategy.pipeline.PipelineRunStrategy;
 
 public class Pipeline {
+    private static final Logger LOGGER = Logger.getLogger(Pipeline.class.getName());
+    
     private String name;
     private List<PipelineStep> steps;
     private PipelineStepFactory stepFactory;
@@ -86,7 +90,7 @@ public class Pipeline {
     private void logMessage(String message) {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String logEntry = timestamp + " - " + message;
-        System.out.println(logEntry);
+        LOGGER.log(Level.INFO, logEntry);
         executionLogs.add(logEntry);
     }
     

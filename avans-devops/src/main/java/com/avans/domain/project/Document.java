@@ -7,7 +7,7 @@ public class Document {
     private String filename;
     private byte[] content;
     private LocalDate uploadDate;
-    private static final long MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+    private static final long MAX_SIZE_BYTES = 10L * 1024 * 1024; // 10 MB - fixed with long cast
     private static final String[] ALLOWED_EXTENSIONS = {
         ".pdf", ".doc", ".docx", ".txt", ".jpg", ".png"
     };

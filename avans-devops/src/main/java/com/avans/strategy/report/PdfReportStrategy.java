@@ -98,7 +98,10 @@ public class PdfReportStrategy implements IReportStrategy {
         // Ideal burndown
         reportContent.append("Ideal: ");
         for (int i = 0; i <= totalDays; i++) {
-            int remaining = Math.max(0, totalItems - (int)((double)i / totalDays * totalItems));
+            int remaining = totalItems;
+            if (totalDays > 0) { // Avoid division by zero
+                remaining = Math.max(0, totalItems - (int)((double)i / totalDays * totalItems));
+            }
             reportContent.append(String.format("%3d", remaining));
         }
         reportContent.append("\n");
@@ -108,7 +111,10 @@ public class PdfReportStrategy implements IReportStrategy {
         for (int i = 0; i <= totalDays; i++) {
             if (i <= daysElapsed) {
                 // For past days, show a simulated actual value (just for demonstration)
-                int actualRemaining = totalItems - (int)((double)i / daysElapsed * completedItems);
+                int actualRemaining = totalItems;
+                if (daysElapsed > 0) { // Fixed division by zero issue
+                    actualRemaining = totalItems - (int)((double)i / daysElapsed * completedItems);
+                }
                 if (i == daysElapsed) actualRemaining = totalItems - completedItems;
                 reportContent.append(String.format("%3d", actualRemaining));
             } else {

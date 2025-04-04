@@ -18,13 +18,32 @@ public class PngReportStrategy implements IReportStrategy {
     public IReport generate(Sprint sprint) {
         StringBuilder reportContent = new StringBuilder();
         
-        // Build a graphical style report (simulated here with text)
+        // Build header
+        buildReportHeader(reportContent, sprint);
+        
+        // Team visualization section
+        buildTeamSection(reportContent, sprint);
+        
+        // Progress chart 
+        buildStatusDashboard(reportContent, sprint);
+        
+        // Burndown chart
+        buildBurndownChart(reportContent, sprint);
+        
+        // Additional metadata specific to PNG format
+        buildMetadataSection(reportContent);
+        
+        return new ConcreteReport(reportContent.toString());
+    }
+    
+    private void buildReportHeader(StringBuilder reportContent, Sprint sprint) {
         reportContent.append("=== PNG SPRINT REPORT (Graphical Format) ===\n\n");
         reportContent.append("Sprint: ").append(sprint.getName()).append("\n");
         reportContent.append("Period: ").append(formatDate(sprint.getStartDate()))
                      .append(" - ").append(formatDate(sprint.getEndDate())).append("\n\n");
-        
-        // Team visualization section
+    }
+    
+    private void buildTeamSection(StringBuilder reportContent, Sprint sprint) {
         reportContent.append("== TEAM VISUALIZATION ==\n");
         reportContent.append("┌────────────────────┐\n");
         reportContent.append("│ Scrum Master:      │\n");
@@ -38,8 +57,9 @@ public class PngReportStrategy implements IReportStrategy {
             reportContent.append("│ ").append(padRight(member.getClass().getSimpleName(), 16)).append(" │\n");
             reportContent.append("└────────────────────┘\n");
         }
-        
-        // Progress chart 
+    }
+    
+    private void buildStatusDashboard(StringBuilder reportContent, Sprint sprint) {
         List<BacklogItem> items = sprint.getBacklogItems();
         
         // Count items by state
@@ -62,106 +82,132 @@ public class PngReportStrategy implements IReportStrategy {
                              .append("\n");
             });
         }
-        
-        // Burndown chart
-        reportContent.append("\n== BURNDOWN CHART ==\n");
-        reportContent.append("Items remaining to complete:\n");
-        
+    }
+    
+    private void buildBurndownChart(StringBuilder reportContent, Sprint sprint) {
+        List<BacklogItem> items = sprint.getBacklogItems();
+        int totalItems = items.size();
         int completedItems = (int) items.stream().filter(item -> item.getState() instanceof DoneState).count();
         int itemsRemaining = totalItems - completedItems;
         int sprintLength = calculateDuration(sprint.getStartDate(), sprint.getEndDate());
         int daysElapsed = calculateDaysElapsed(sprint.getStartDate(), LocalDate.now());
         
-        if (sprintLength > 0) {
-            // Print day header
-            reportContent.append("     ");
-            for (int day = 0; day <= sprintLength; day++) {
-                reportContent.append(String.format("%2d ", day));
+        reportContent.append("\n== BURNDOWN CHART ==\n");
+        reportContent.append("Items remaining to complete:\n");
+        
+        if (sprintLength <= 0) {
+            reportContent.append("No valid sprint duration available.\n");
+            return;
+        }
+        
+        // Print day headers
+        buildBurndownHeaders(reportContent, sprintLength);
+        
+        // Build ideal and actual lines
+        buildBurndownLines(reportContent, totalItems, completedItems, itemsRemaining, sprintLength, daysElapsed);
+        
+        // Build visual chart
+        buildVisualBurndownChart(reportContent, totalItems, completedItems, itemsRemaining, sprintLength, daysElapsed);
+    }
+    
+    private void buildBurndownHeaders(StringBuilder reportContent, int sprintLength) {
+        reportContent.append("     ");
+        for (int day = 0; day <= sprintLength; day++) {
+            reportContent.append(String.format("%2d ", day));
+        }
+        reportContent.append("\n");
+    }
+    
+    private void buildBurndownLines(StringBuilder reportContent, int totalItems, int completedItems, 
+                                   int itemsRemaining, int sprintLength, int daysElapsed) {
+        // Ideal line
+        reportContent.append("Ideal");
+        for (int day = 0; day <= sprintLength; day++) {
+            int expected = totalItems - (int)((double)day / sprintLength * totalItems);
+            reportContent.append(String.format("%2d ", expected));
+        }
+        reportContent.append("\n");
+        
+        // Actual line (with question marks for future)
+        reportContent.append("Actual");
+        for (int day = 0; day <= sprintLength; day++) {
+            if (day <= daysElapsed) {
+                // For past days, interpolate a simulated value
+                int actual = totalItems;
+                if (daysElapsed > 0) { // Prevent division by zero
+                    actual = totalItems - (int)((double)day / daysElapsed * completedItems);
+                }
+                if (day == daysElapsed) {
+                    actual = itemsRemaining;
+                }
+                reportContent.append(String.format("%2d ", actual));
+            } else {
+                reportContent.append(" ? ");
             }
-            reportContent.append("\n");
+        }
+        reportContent.append("\n");
+    }
+    
+    private void buildVisualBurndownChart(StringBuilder reportContent, int totalItems, int completedItems, 
+                                         int itemsRemaining, int sprintLength, int daysElapsed) {
+        // Visual representation
+        for (int items = totalItems; items >= 0; items--) {
+            reportContent.append(String.format("%3d |", items));
             
-            // Ideal line
-            reportContent.append("Ideal");
             for (int day = 0; day <= sprintLength; day++) {
                 int expected = totalItems - (int)((double)day / sprintLength * totalItems);
-                reportContent.append(String.format("%2d ", expected));
-            }
-            reportContent.append("\n");
-            
-            // Actual line (with question marks for future)
-            reportContent.append("Actual");
-            for (int day = 0; day <= sprintLength; day++) {
+                
                 if (day <= daysElapsed) {
-                    // For past days, interpolate a simulated value
                     int actual = totalItems;
-                    if (daysElapsed > 0) {
+                    if (daysElapsed > 0) { // Prevent division by zero
                         actual = totalItems - (int)((double)day / daysElapsed * completedItems);
                     }
                     if (day == daysElapsed) {
                         actual = itemsRemaining;
                     }
-                    reportContent.append(String.format("%2d ", actual));
-                } else {
-                    reportContent.append(" ? ");
-                }
-            }
-            reportContent.append("\n");
-            
-            // Visual representation
-            for (int remainingItems = totalItems; remainingItems >= 0; remainingItems--) {
-                reportContent.append(String.format("%3d |", remainingItems));
-                
-                for (int day = 0; day <= sprintLength; day++) {
-                    int expected = totalItems - (int)((double)day / sprintLength * totalItems);
                     
-                    if (day <= daysElapsed) {
-                        int actual = totalItems;
-                        if (daysElapsed > 0) {
-                            actual = totalItems - (int)((double)day / daysElapsed * completedItems);
-                        }
-                        if (day == daysElapsed) {
-                            actual = itemsRemaining;
-                        }
-                        
-                        if (remainingItems == expected && remainingItems == actual) {
-                            reportContent.append(" X "); // Both ideal and actual
-                        } else if (remainingItems == expected) {
-                            reportContent.append(" I "); // Ideal only
-                        } else if (remainingItems == actual) {
-                            reportContent.append(" A "); // Actual only
-                        } else {
-                            reportContent.append("   ");
-                        }
+                    if (items == expected && items == actual) {
+                        reportContent.append(" X "); // Both ideal and actual
+                    } else if (items == expected) {
+                        reportContent.append(" I "); // Ideal only
+                    } else if (items == actual) {
+                        reportContent.append(" A "); // Actual only
                     } else {
-                        if (remainingItems == expected) {
-                            reportContent.append(" I "); // Ideal only
-                        } else {
-                            reportContent.append("   ");
-                        }
+                        reportContent.append("   ");
+                    }
+                } else {
+                    if (items == expected) {
+                        reportContent.append(" I "); // Ideal only
+                    } else {
+                        reportContent.append("   ");
                     }
                 }
-                reportContent.append("\n");
-            }
-            
-            reportContent.append("    +");
-            reportContent.append("-".repeat((sprintLength + 1) * 3));
-            reportContent.append("\n");
-            
-            reportContent.append("     ");
-            for (int day = 0; day <= sprintLength; day++) {
-                reportContent.append(String.format("%2d ", day));
             }
             reportContent.append("\n");
         }
         
-        // Additional metadata specific to PNG format
+        // Chart footer
+        buildChartFooter(reportContent, sprintLength);
+    }
+    
+    private void buildChartFooter(StringBuilder reportContent, int sprintLength) {
+        reportContent.append("    +");
+        reportContent.append("-".repeat((sprintLength + 1) * 3));
+        reportContent.append("\n");
+        
+        reportContent.append("     ");
+        for (int day = 0; day <= sprintLength; day++) {
+            reportContent.append(String.format("%2d ", day));
+        }
+        reportContent.append("\n");
+    }
+    
+    private void buildMetadataSection(StringBuilder reportContent) {
         reportContent.append("\n== IMAGE METADATA ==\n");
         reportContent.append("Generated on: ").append(formatDate(LocalDate.now())).append("\n");
         reportContent.append("Format: PNG Image\n");
         reportContent.append("Resolution: 1280x720px\n");
         reportContent.append("Color mode: RGB\n");
-        
-        return new ConcreteReport(reportContent.toString());
     }
     
     private String formatDate(LocalDate date) {
