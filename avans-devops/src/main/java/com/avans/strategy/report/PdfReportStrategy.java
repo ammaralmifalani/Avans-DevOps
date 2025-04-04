@@ -18,121 +18,158 @@ public class PdfReportStrategy implements IReportStrategy {
     public IReport generate(Sprint sprint) {
         StringBuilder reportContent = new StringBuilder();
         
-        // Build a professional PDF-style report
-        reportContent.append("=== PDF SPRINT REPORT ===\n\n");
-        reportContent.append("Sprint: ").append(sprint.getName()).append("\n");
-        reportContent.append("Duration: ").append(formatDate(sprint.getStartDate()))
-                     .append(" to ").append(formatDate(sprint.getEndDate())).append("\n");
-        reportContent.append("Duration (days): ").append(calculateDuration(sprint.getStartDate(), sprint.getEndDate())).append("\n\n");
+        // Build different sections of the report
+        appendHeaderSection(reportContent, sprint);
+        appendTeamSection(reportContent, sprint);
+        appendBacklogSection(reportContent, sprint);
+        appendProgressSection(reportContent, sprint);
+        appendMetadataSection(reportContent);
         
-        // Team members section
-        reportContent.append("== TEAM COMPOSITION ==\n");
-        reportContent.append("Scrum Master: ").append(getScrumMasterName(sprint)).append("\n");
-        reportContent.append("Team Members:\n");
+        return new ConcreteReport(reportContent.toString());
+    }
+    
+    private void appendHeaderSection(StringBuilder builder, Sprint sprint) {
+        builder.append("=== PDF SPRINT REPORT ===\n\n");
+        builder.append("Sprint: ").append(sprint.getName()).append("\n");
+        builder.append("Duration: ").append(formatDate(sprint.getStartDate()))
+               .append(" to ").append(formatDate(sprint.getEndDate())).append("\n");
+        builder.append("Duration (days): ").append(calculateDuration(sprint.getStartDate(), sprint.getEndDate())).append("\n\n");
+    }
+    
+    private void appendTeamSection(StringBuilder builder, Sprint sprint) {
+        builder.append("== TEAM COMPOSITION ==\n");
+        builder.append("Scrum Master: ").append(getScrumMasterName(sprint)).append("\n");
+        builder.append("Team Members:\n");
+        
         for (TeamMember member : sprint.getTeamMembers()) {
-            reportContent.append("- ").append(member.getName())
-                         .append(" (").append(member.getClass().getSimpleName()).append(")\n");
+            builder.append("- ").append(member.getName())
+                   .append(" (").append(member.getClass().getSimpleName()).append(")\n");
         }
-        
-        // Backlog items section
-        reportContent.append("\n== BACKLOG ITEMS ==\n");
+    }
+    
+    private void appendBacklogSection(StringBuilder builder, Sprint sprint) {
         List<BacklogItem> items = sprint.getBacklogItems();
-        reportContent.append("Total Items: ").append(items.size()).append("\n");
+        
+        builder.append("\n== BACKLOG ITEMS ==\n");
+        builder.append("Total Items: ").append(items.size()).append("\n");
         
         // Count items by state
         Map<String, Long> stateCount = items.stream()
             .collect(Collectors.groupingBy(item -> item.getState().getName(), Collectors.counting()));
         
-        reportContent.append("\nItems by Status:\n");
+        builder.append("\nItems by Status:\n");
         stateCount.forEach((state, count) -> 
-            reportContent.append("- ").append(state).append(": ").append(count).append("\n")
+            builder.append("- ").append(state).append(": ").append(count).append("\n")
         );
         
-        // List items
-        reportContent.append("\nItem Details:\n");
+        appendItemDetails(builder, items);
+    }
+    
+    private void appendItemDetails(StringBuilder builder, List<BacklogItem> items) {
+        builder.append("\nItem Details:\n");
+        
         for (BacklogItem item : items) {
-            reportContent.append("- ").append(item.getTitle())
-                         .append(" [").append(item.getState().getName()).append("] ");
+            builder.append("- ").append(item.getTitle())
+                   .append(" [").append(item.getState().getName()).append("] ");
             
             if (item.getAssignedDeveloper() != null) {
-                reportContent.append("- Assigned to: ").append(item.getAssignedDeveloper().getName());
+                builder.append("- Assigned to: ").append(item.getAssignedDeveloper().getName());
             }
-            reportContent.append("\n");
+            builder.append("\n");
             
-            // List activities
-            if (item.getActivityCount() > 0) {
-                reportContent.append("  Activities:\n");
-                for (var activity : item.getActivities()) {
-                    reportContent.append("  * ").append(activity.getTitle())
-                                 .append(" (").append(activity.getTotalEstimatedHours()).append("h) ");
-                    if (activity.isDone()) {
-                        reportContent.append("[Completed]");
-                    } else {
-                        reportContent.append("[In Progress]");
-                    }
-                    reportContent.append("\n");
-                }
-            }
+            appendActivities(builder, item);
+        }
+    }
+    
+    private void appendActivities(StringBuilder builder, BacklogItem item) {
+        if (item.getActivityCount() <= 0) {
+            return;
         }
         
-        // Sprint progress
-        reportContent.append("\n== SPRINT PROGRESS ==\n");
+        builder.append("  Activities:\n");
+        for (var activity : item.getActivities()) {
+            builder.append("  * ").append(activity.getTitle())
+                   .append(" (").append(activity.getTotalEstimatedHours()).append("h) ");
+            builder.append(activity.isDone() ? "[Completed]" : "[In Progress]");
+            builder.append("\n");
+        }
+    }
+    
+    private void appendProgressSection(StringBuilder builder, Sprint sprint) {
+        List<BacklogItem> items = sprint.getBacklogItems();
         int totalItems = items.size();
-        int completedItems = (int) items.stream().filter(item -> item.getState() instanceof DoneState).count();
+        int completedItems = countDoneItems(items);
+        
+        builder.append("\n== SPRINT PROGRESS ==\n");
         double completionPercentage = totalItems > 0 ? (double) completedItems / totalItems * 100 : 0;
+        builder.append("Completion: ").append(String.format("%.1f%%", completionPercentage)).append("\n");
         
-        reportContent.append("Completion: ").append(String.format("%.1f%%", completionPercentage)).append("\n");
-        
-        // Burndown chart (ASCII art)
-        reportContent.append("\n== BURNDOWN CHART ==\n");
+        appendBurndownChart(builder, sprint, totalItems, completedItems);
+    }
+    
+    private int countDoneItems(List<BacklogItem> items) {
+        return (int) items.stream()
+                .filter(item -> item.getState() instanceof DoneState)
+                .count();
+    }
+    
+    private void appendBurndownChart(StringBuilder builder, Sprint sprint, int totalItems, int completedItems) {
         int totalDays = calculateDuration(sprint.getStartDate(), sprint.getEndDate());
         int daysElapsed = calculateDaysElapsed(sprint.getStartDate(), LocalDate.now());
         
-        // Header
-        reportContent.append("Days: ");
-        for (int i = 0; i <= totalDays; i++) {
-            reportContent.append(String.format("%3d", i));
-        }
-        reportContent.append("\n");
+        builder.append("\n== BURNDOWN CHART ==\n");
         
-        // Ideal burndown
-        reportContent.append("Ideal: ");
+        // Print days header
+        builder.append("Days: ");
+        for (int i = 0; i <= totalDays; i++) {
+            builder.append(String.format("%3d", i));
+        }
+        builder.append("\n");
+        
+        appendIdealBurndown(builder, totalItems, totalDays);
+        appendActualBurndown(builder, totalItems, completedItems, daysElapsed, totalDays);
+        
+        builder.append("Current completed work: ").append(completedItems)
+               .append(" of ").append(totalItems).append(" items\n");
+    }
+    
+    private void appendIdealBurndown(StringBuilder builder, int totalItems, int totalDays) {
+        builder.append("Ideal: ");
         for (int i = 0; i <= totalDays; i++) {
             int remaining = totalItems;
             if (totalDays > 0) { // Avoid division by zero
                 remaining = Math.max(0, totalItems - (int)((double)i / totalDays * totalItems));
             }
-            reportContent.append(String.format("%3d", remaining));
+            builder.append(String.format("%3d", remaining));
         }
-        reportContent.append("\n");
-        
-        // Actual burndown
-        reportContent.append("Actual: ");
+        builder.append("\n");
+    }
+    
+    private void appendActualBurndown(StringBuilder builder, int totalItems, int completedItems, 
+                                    int daysElapsed, int totalDays) {
+        builder.append("Actual: ");
         for (int i = 0; i <= totalDays; i++) {
             if (i <= daysElapsed) {
-                // For past days, show a simulated actual value (just for demonstration)
                 int actualRemaining = totalItems;
                 if (daysElapsed > 0) { // Fixed division by zero issue
                     actualRemaining = totalItems - (int)((double)i / daysElapsed * completedItems);
                 }
-                if (i == daysElapsed) actualRemaining = totalItems - completedItems;
-                reportContent.append(String.format("%3d", actualRemaining));
+                if (i == daysElapsed) {
+                    actualRemaining = totalItems - completedItems;
+                }
+                builder.append(String.format("%3d", actualRemaining));
             } else {
-                reportContent.append("  ?");
+                builder.append("  ?");
             }
         }
-        reportContent.append("\n");
-        
-        // Current progress
-        reportContent.append("Current completed work: ").append(completedItems).append(" of ").append(totalItems).append(" items\n");
-        
-        // Additional metadata
-        reportContent.append("\n== DOCUMENT METADATA ==\n");
-        reportContent.append("Generated on: ").append(formatDate(LocalDate.now())).append("\n");
-        reportContent.append("Format: PDF Report\n");
-        reportContent.append("Version: 1.0\n");
-        
-        return new ConcreteReport(reportContent.toString());
+        builder.append("\n");
+    }
+    
+    private void appendMetadataSection(StringBuilder builder) {
+        builder.append("\n== DOCUMENT METADATA ==\n");
+        builder.append("Generated on: ").append(formatDate(LocalDate.now())).append("\n");
+        builder.append("Format: PDF Report\n");
+        builder.append("Version: 1.0\n");
     }
     
     private String formatDate(LocalDate date) {

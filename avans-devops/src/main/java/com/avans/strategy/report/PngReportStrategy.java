@@ -123,7 +123,7 @@ public class PngReportStrategy implements IReportStrategy {
         // Ideal line
         reportContent.append("Ideal");
         for (int day = 0; day <= sprintLength; day++) {
-            int expected = totalItems - (int)((double)day / sprintLength * totalItems);
+            int expected = calculateIdealRemaining(totalItems, day, sprintLength);
             reportContent.append(String.format("%2d ", expected));
         }
         reportContent.append("\n");
@@ -132,14 +132,7 @@ public class PngReportStrategy implements IReportStrategy {
         reportContent.append("Actual");
         for (int day = 0; day <= sprintLength; day++) {
             if (day <= daysElapsed) {
-                // For past days, interpolate a simulated value
-                int actual = totalItems;
-                if (daysElapsed > 0) { // Prevent division by zero
-                    actual = totalItems - (int)((double)day / daysElapsed * completedItems);
-                }
-                if (day == daysElapsed) {
-                    actual = itemsRemaining;
-                }
+                int actual = calculateActualRemaining(totalItems, completedItems, day, daysElapsed, itemsRemaining);
                 reportContent.append(String.format("%2d ", actual));
             } else {
                 reportContent.append(" ? ");
@@ -150,44 +143,83 @@ public class PngReportStrategy implements IReportStrategy {
     
     private void buildVisualBurndownChart(StringBuilder reportContent, int totalItems, int completedItems, 
                                          int itemsRemaining, int sprintLength, int daysElapsed) {
-        // Visual representation
+        // Visual representation - draw rows from top to bottom
         for (int items = totalItems; items >= 0; items--) {
-            reportContent.append(String.format("%3d |", items));
+            appendRowStart(reportContent, items);
             
+            // Draw each day column
             for (int day = 0; day <= sprintLength; day++) {
-                int expected = totalItems - (int)((double)day / sprintLength * totalItems);
-                
-                if (day <= daysElapsed) {
-                    int actual = totalItems;
-                    if (daysElapsed > 0) { // Prevent division by zero
-                        actual = totalItems - (int)((double)day / daysElapsed * completedItems);
-                    }
-                    if (day == daysElapsed) {
-                        actual = itemsRemaining;
-                    }
-                    
-                    if (items == expected && items == actual) {
-                        reportContent.append(" X "); // Both ideal and actual
-                    } else if (items == expected) {
-                        reportContent.append(" I "); // Ideal only
-                    } else if (items == actual) {
-                        reportContent.append(" A "); // Actual only
-                    } else {
-                        reportContent.append("   ");
-                    }
-                } else {
-                    if (items == expected) {
-                        reportContent.append(" I "); // Ideal only
-                    } else {
-                        reportContent.append("   ");
-                    }
-                }
+                appendDayColumn(reportContent, items, day, totalItems, completedItems, 
+                               itemsRemaining, sprintLength, daysElapsed);
             }
+            
             reportContent.append("\n");
         }
         
         // Chart footer
         buildChartFooter(reportContent, sprintLength);
+    }
+    
+    private void appendRowStart(StringBuilder reportContent, int items) {
+        reportContent.append(String.format("%3d |", items));
+    }
+    
+    private void appendDayColumn(StringBuilder reportContent, int currentRow, int day, 
+                                int totalItems, int completedItems, int itemsRemaining, 
+                                int sprintLength, int daysElapsed) {
+        // Calculate expected values for this day
+        int expected = calculateIdealRemaining(totalItems, day, sprintLength);
+        
+        // For past days, show both ideal and actual, for future days only ideal
+        if (day <= daysElapsed) {
+            int actual = calculateActualRemaining(totalItems, completedItems, day, daysElapsed, itemsRemaining);
+            appendPastDaySymbol(reportContent, currentRow, expected, actual);
+        } else {
+            appendFutureDaySymbol(reportContent, currentRow, expected);
+        }
+    }
+    
+    private void appendPastDaySymbol(StringBuilder reportContent, int currentRow, int expected, int actual) {
+        if (currentRow == expected && currentRow == actual) {
+            reportContent.append(" X "); // Both ideal and actual
+        } else if (currentRow == expected) {
+            reportContent.append(" I "); // Ideal only
+        } else if (currentRow == actual) {
+            reportContent.append(" A "); // Actual only
+        } else {
+            reportContent.append("   ");
+        }
+    }
+    
+    private void appendFutureDaySymbol(StringBuilder reportContent, int currentRow, int expected) {
+        if (currentRow == expected) {
+            reportContent.append(" I "); // Ideal only
+        } else {
+            reportContent.append("   ");
+        }
+    }
+    
+    private int calculateIdealRemaining(int totalItems, int day, int sprintLength) {
+        if (sprintLength <= 0) {
+            return totalItems;
+        }
+        return totalItems - (int)((double)day / sprintLength * totalItems);
+    }
+    
+    private int calculateActualRemaining(int totalItems, int completedItems, int day, 
+                                       int daysElapsed, int itemsRemaining) {
+        if (daysElapsed <= 0) {
+            return totalItems;
+        }
+        
+        int actual = totalItems - (int)((double)day / daysElapsed * completedItems);
+        
+        // If this is the current day, use the actual remaining count
+        if (day == daysElapsed) {
+            actual = itemsRemaining;
+        }
+        
+        return actual;
     }
     
     private void buildChartFooter(StringBuilder reportContent, int sprintLength) {
