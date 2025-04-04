@@ -117,8 +117,8 @@
             <id>sonar</id>
             <properties>
                 <!-- Replace with your actual details from SonarCloud -->
-                <sonar.projectKey>your-project-key</sonar.projectKey>
-                <sonar.organization>your-organization</sonar.organization>
+                <sonar.projectKey>4514c6a53a252f1e286d9b138851906a8aeddd45</sonar.projectKey>
+                <sonar.organization>mqlstam</sonar.organization>
                 <sonar.host.url>https://sonarcloud.io</sonar.host.url>
             </properties>
             <build>
