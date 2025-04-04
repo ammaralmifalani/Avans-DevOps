@@ -21,7 +21,7 @@ public class BacklogItem extends Subject {
 
     public BacklogItem(String title) {
         this.title = title;
-        this.state = new TodoState(); // start in TODO
+        this.state = new TodoState(); 
         this.activities = new ArrayList<>();
     }
 
